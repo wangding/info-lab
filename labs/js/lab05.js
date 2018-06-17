@@ -1,10 +1,10 @@
 /* global c echarts roundFractional: true */
 $(function() {
-  var $form    = $('.controller'),
+  let $form    = $('.controller'),
       $txtNub  = $('input[type="number"]'),
       $btnDraw = $('input[type="button"]');
 
-  var Data  = [],
+  let Data  = [],
       chart = null;
 
   /* global $forkMeGH, $bszPageFooter */
@@ -29,7 +29,7 @@ $(function() {
   function onDrawClick() {
     chart = echarts.init($('.diagram').get(0));
 
-    var option = {
+    let option = {
       title: {
         text: '串联信道容量函数曲线',
         x: 'center',
@@ -87,12 +87,12 @@ $(function() {
   }
 
   function generateData() {
-    var step = 1 / ($txtNub.val() - 1);
+    let step = 1 / ($txtNub.val() - 1);
 
     Data = [];
 
-    for(var p = 0; p < 1; p += step) {
-      var d = [];
+    for(let p = 0; p < 1; p += step) {
+      let d = [];
       d.push(roundFractional(p, 3));
       d.push(c(p));
       d.push(c(2*p*(1-p)));
@@ -108,7 +108,7 @@ $(function() {
 
   function displayDataTable() {
     $('.data-table').html('');
-    var $tableDOM = $(''
+    let $tableDOM = $(''
       + '<table>'
         + '<thead>'
           + '<tr>'
@@ -122,10 +122,10 @@ $(function() {
         + '</tbody>'
       + '</table>');
     $('.data-table').append($tableDOM);
-    var $tbody = $tableDOM.find('tbody');
+    let $tbody = $tableDOM.find('tbody');
 
-    for(var j=0; j<Data.length; j++) {
-      var $tr = $('<tr></tr>');
+    for(let j=0; j<Data.length; j++) {
+      let $tr = $('<tr></tr>');
       $tr.append('<td>' + (j + 1) + '</td>');
       $tr.append('<td>' + Data[j][0] + '</td>');
       $tr.append('<td>' + Data[j][1] + '</td>');

@@ -1,7 +1,8 @@
 {
   "env": {
     "browser": true,
-    "jquery": true
+    "jquery": true,
+    "es6": true
   },
   "extends": "eslint:recommended",
   "rules": {
@@ -27,7 +28,7 @@
     ],
     "no-console": [
       "error",
-      { "allow": ["error"] }
+      { "allow": ["error", "log"] }
     ]
   }
 }

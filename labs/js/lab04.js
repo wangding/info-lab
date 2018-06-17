@@ -1,6 +1,6 @@
 /* global roundFractional: true */
 $(function() {
-  var $form     = $('.controller'),                    // 表单
+  let $form     = $('.controller'),                    // 表单
       $p        = $('.channel input[type="number"]'),  // 错误转移概率文本框
       $inputImg = $('.input img'),              
       inputImg  = $inputImg.get(0),                    // 信源图片
@@ -15,7 +15,7 @@ $(function() {
 
   function onClick() {
     outputImg.style.display = 'none';
-    var file = $inputImg.attr('src');
+    let file = $inputImg.attr('src');
     file = file.replace(/\d/, function(n) { return (Number(n) + 1) % 3; });
     $inputImg.attr('src', file);
   }
@@ -24,18 +24,18 @@ $(function() {
     e.preventDefault();
     
     // 准备参数
-    var width = inputImg.width, height = inputImg.height;
+    let width = inputImg.width, height = inputImg.height;
 
     outputImg.width = width;
     outputImg.height = height;
 
-    var p = Number($p.val());                   // 错误转移概率
-    var ctx = outputImg.getContext('2d'); 
+    let p = Number($p.val());                   // 错误转移概率
+    let ctx = outputImg.getContext('2d');
     ctx.drawImage(inputImg, 0, 0, width, height);
 
-    var imgData = ctx.getImageData(0, 0, width, height);
-    var totalPixel = width * height;            // 图片总像素数
-    var pixels;                                 // 产生干扰的像素数
+    let imgData = ctx.getImageData(0, 0, width, height);
+    let totalPixel = width * height;            // 图片总像素数
+    let pixels;                                 // 产生干扰的像素数
     
     if(p > 0.5) {
       pixels = roundFractional(totalPixel * (1-p), 0);
@@ -49,9 +49,9 @@ $(function() {
     //  width, height, totalPixel, pixels);
    
     // 产生干扰数据
-    var xy = {};
-    for(var j=0; j<pixels; j++) {
-      var x   = roundFractional(Math.random() * (width - 1), 0),
+    let xy = {};
+    for(let j=0; j<pixels; j++) {
+      let x   = roundFractional(Math.random() * (width - 1), 0),
           y   = roundFractional(Math.random() * (height - 1), 0),
           key = x + ',' + y;
 
@@ -78,11 +78,11 @@ $(function() {
    * @returns {undefined} 无返回值
    */
   function convertImg(imgData) {
-    var width  = imgData.width,
+    let width  = imgData.width,
         height = imgData.height;
 
-    for(var y=0; y<height; y++) {
-      for(var x=0; x<width; x++) {
+    for(let y=0; y<height; y++) {
+      for(let x=0; x<width; x++) {
         convertPixel(imgData, x, y);
       }
     }
@@ -97,7 +97,7 @@ $(function() {
    * @returns {undefined} 无返回值
    */
   function convertPixel(imgData, x, y) {
-    var width = imgData.width,
+    let width = imgData.width,
         data  = imgData.data,
         pos   = (y * width * 4) + (x * 4);
 

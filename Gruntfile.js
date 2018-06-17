@@ -26,7 +26,7 @@ module.exports = function (grunt) {
         dest: 'dist/'
       }
     },
-    uglify: {
+    terser: {
       main: {
         files: [{
           expand: true,
@@ -77,7 +77,7 @@ module.exports = function (grunt) {
     }
   });
 
-  grunt.loadNpmTasks('grunt-contrib-uglify');
+  grunt.loadNpmTasks('grunt-terser');
   grunt.loadNpmTasks('grunt-contrib-htmlmin');
   grunt.loadNpmTasks('grunt-contrib-cssmin');
   grunt.loadNpmTasks('grunt-contrib-imagemin');
@@ -87,6 +87,6 @@ module.exports = function (grunt) {
   grunt.loadNpmTasks('grunt-eslint');
 
   grunt.registerTask('lint', ['htmlhint', 'csslint', 'eslint']);
-  grunt.registerTask('build', ['htmlmin', 'cssmin', 'uglify', 'imagemin']);
+  grunt.registerTask('build', ['htmlmin', 'cssmin', 'terser']);
   grunt.registerTask('upload', ['qiniu_qupload']);
 };
