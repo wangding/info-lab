@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+  <title>实验四、BSC 信道仿真</title>
+  <link rel="icon" href="http://i.wangding.in/favicon.ico" sizes="48x48" type="image/png">
+  <link rel="stylesheet" href="css/normalize.css">
+  <link rel="stylesheet" href="css/lab04.css">
+</head>
+<body>
+<h1>实验四、BSC 信道仿真</h1>
+<form class="controller">
+  <div class="input">
+    <img src="images/dilbert0.png" alt="信源图片" title="信源图片，点击切换图片">
+  </div>
+  <div class="channel">
+    <div>
+      <span>错误转移概率&nbsp;p&nbsp;=</span>
+      <input type="number" min="0" max="1" value="0.1" step="0.01" required><br>
+      <img alt="BSC 信道转移矩阵" width="190" src="images/bsc.png" title="BSC 信道转移矩阵"><br>
+      <input type="submit" value="传 输   ===》" title="点击此按钮，将左侧信源图片通过 BSC 信道传输到右侧">
+    </div>
+  </div>
+  <div class="output">
+    <canvas title="信宿图片"></canvas>
+  </div>
+</form>
+<script src="//apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/echarts/4.0.2/echarts.min.js"></script>
+<script src="js/lib.js"></script>
+<script src="js/lab04.js"></script>
+</body>
+</html>
