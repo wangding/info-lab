@@ -1,0 +1,31 @@
+{
+  "name": "info-lab",
+  "version": "1.0.0",
+  "description": "信息科学基础在线实验",
+  "main": "index.js",
+  "scripts": {
+    "test": "grunt lint && eslint --quiet *",
+    "build": "grunt build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wangding/info-lab.git"
+  },
+  "author": "wangding",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/wangding/info-lab/issues"
+  },
+  "homepage": "https://github.com/wangding/info-lab#readme",
+  "devDependencies": {
+    "eslint": "^4.19.1",
+    "grunt": "^1.0.3",
+    "grunt-contrib-copy": "^1.0.0",
+    "grunt-contrib-csslint": "^2.0.0",
+    "grunt-contrib-cssmin": "^2.2.1",
+    "grunt-contrib-htmlmin": "^2.4.0",
+    "grunt-contrib-imagemin": "^2.0.1",
+    "grunt-contrib-uglify": "^3.3.0",
+    "grunt-htmlhint": "^0.9.13"
+  }
+}
