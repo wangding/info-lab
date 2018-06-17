@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+  <title>实验五、串联信道容量曲线绘制</title>
+  <link rel="icon" href="http://i.wangding.in/favicon.ico" sizes="48x48" type="image/png">
+  <link rel="stylesheet" href="css/normalize.css">
+  <link rel="stylesheet" href="css/lab05.css">
+</head>
+<body>
+<h1>实验五、串联信道容量曲线绘制</h1>
+<form class="controller">
+  <span>pi&nbsp;数量：</span>
+  <input type="number" min="3" max="100" value="19" title="在 [0, 1] 区间生成若干个均匀递增的概率" required>
+  <input type="submit" value="生成数据" title="生成概率数据并计算信道容量">
+  <input type="button" value="绘制曲线" title="绘制信道容量函数曲线" disabled>
+</form>
+<div class="data-table"></div>
+<div class="diagram"></div>
+<script src="//apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/echarts/4.0.2/echarts.min.js"></script>
+<script src="js/lib.js"></script>
+<script src="js/lab05.js"></script>
+</body>
+</html>
