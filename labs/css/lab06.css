@@ -1,0 +1,22 @@
+input[type="file"] {
+  display: none;
+}
+
+.output {
+  bottom: 0;
+  box-sizing: border-box;
+  left: 0;
+  overflow-y: scroll;
+  padding: 20px;
+  position: absolute;
+  top: 130px;
+  width: 100%;
+  background-color: black;
+  color: white;
+  font-size: 14pt;
+}
+
+pre {
+  font-family: Consolas;
+  line-height: 27px;
+}
