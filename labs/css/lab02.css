@@ -1,19 +1,23 @@
 table {
-  width: 50%;
+  width: 60%;
 }
 
 thead td:nth-child(1) {
-  width: 20%;
+  width: 19%;
   font-weight: 600;
 }
 
 thead td:nth-child(2) {
-  width: 40%;
+  width: 27%;
   font-weight: 600;
 }
 
 thead td:nth-child(3) {
-  width: 40%;
+  width: 27%;
   font-weight: 600;
 }
 
+thead td:nth-child(4) {
+  width: 27%;
+  font-weight: 600;
+}

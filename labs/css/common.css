@@ -1,0 +1,50 @@
+h1 {
+  font-size: 1.6em;
+  color: #666;
+}
+
+.controller {
+  padding: 10px 10px;
+  background: #eee;
+}
+
+input[type="number"] {
+  width: 40px;
+  margin: 0 5px;
+  font-size: 1em;
+}
+
+input[type="submit"], input[type="button"] {
+  width: 80px;
+  height: 30px;
+  margin: 0 10px;
+}
+
+.data-table {
+  position: absolute;
+  top: 130px;
+  left: 0;
+  bottom: 0;
+  width: 50%;
+  overflow-y: scroll;
+}
+
+.diagram {
+  position: absolute;
+  top: 130px;
+  right: 0;
+  bottom: 0;
+  width: 50%;
+  padding: 20px 0;
+}
+
+table {
+  margin: 20px auto;
+  border-collapse: collapse;
+  border: 1px solid #999;
+}
+
+td {
+  border: 1px solid #999;
+  text-align: center;
+}

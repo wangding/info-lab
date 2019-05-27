@@ -26,7 +26,7 @@ $(function() {
 
     var option = {
       title: {
-        text: '熵函数曲线',
+        text: '二进熵函数曲线',
         x: 'center',
         y: 0
       },
@@ -45,7 +45,7 @@ $(function() {
         axisPointer: {show: 'true'}
       },
       series: [{
-        name: '熵',
+        name: '二进熵',
         type: 'line',
         smooth: 'true',
         data: Data
@@ -78,9 +78,10 @@ $(function() {
       + '<table>'
         + '<thead>'
           + '<tr>'
-            + '<td>编号</td>'
-            + '<td>概率</td>'
-            + '<td>自信息量</td>'
+            + '<td>NO.</td>'
+            + '<td>p</td>'
+            + '<td>1-p</td>'
+            + '<td>H(p)</td>'
           + '</tr>'
         + '<tbody>'
         + '</tbody>'
@@ -92,6 +93,7 @@ $(function() {
       var $tr = $('<tr></tr>');
       $tr.append('<td>' + (j + 1) + '</td>');
       $tr.append('<td>' + Data[j][0] + '</td>');
+      $tr.append('<td>' + roundFractional(1 - Data[j][0], 3) + '</td>');
       $tr.append('<td>' + Data[j][1] + '</td>');
       $tbody.append($tr);
     }

@@ -1,76 +1,28 @@
-h1 {
-  font-size: 1.6em;
-  color: #666;
-}
-
-.controller {
-  padding: 10px 10px;
-  background: #eee;
-}
-
-input[type="number"] {
-  width: 40px;
-  margin: 0 5px;
-  font-size: 1em;
-}
-
-input[type="submit"], input[type="button"] {
-  width: 80px;
-  height: 30px;
-  margin: 0 10px;
-}
-
-.data-table {
-  position: absolute;
-  top: 130px;
-  left: 0;
-  bottom: 0;
-  width: 50%;
-  overflow-y: scroll;
-}
-
-.diagram {
-  position: absolute;
-  top: 130px;
-  right: 0;
-  bottom: 0;
-  width: 50%;
-  padding: 20px 0;
-}
-
 table {
-  width: 50%;
-  margin: 20px auto;
-  border-collapse: collapse;
-  border: 1px solid #999;
-}
-
-td {
-  border: 1px solid #999;
-  text-align: center;
+  width: 70%;
 }
 
 thead td:nth-child(1) {
-  width: 8%;
+  width: 12%;
   font-weight: 600;
 }
 
 thead td:nth-child(2) {
-  width: 23%;
+  width: 22%;
   font-weight: 600;
 }
 
 thead td:nth-child(3) {
-  width: 23%;
+  width: 22%;
   font-weight: 600;
 }
 
 thead td:nth-child(4) {
-  width: 23%;
+  width: 22%;
   font-weight: 600;
 }
 
 thead td:nth-child(5) {
-  width: 23%;
+  width: 22%;
   font-weight: 600;
 }
