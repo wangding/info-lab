@@ -9,6 +9,9 @@ $(function() {
   $form.submit(onTrans);
   $inputImg.click(onClick);
 
+  /* global $forkMeGH */
+  $forkMeGH.show('https://github.com/wangding/info-lab');
+
   function onClick() {
     outputImg.style.display = 'none';
     var file = $inputImg.attr('src');

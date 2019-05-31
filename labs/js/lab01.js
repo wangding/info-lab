@@ -8,6 +8,8 @@ $(function() {
 
   $form.submit(onGenClick);
   $btnDraw.click(onDrawClick);
+  /* global $forkMeGH */
+  $forkMeGH.show('https://github.com/wangding/info-lab');
 
   window.onresize = function() {
     if(chart !== null) chart.resize();
