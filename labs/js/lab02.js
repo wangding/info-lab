@@ -6,8 +6,9 @@ $(function() {
   var Data = [],
       chart = null;
 
-  /* global $forkMeGH */
+  /* global $forkMeGH, $bszPageFooter */
   $forkMeGH.show('https://github.com/wangding/info-lab');
+  $bszPageFooter.show('body');
 
   $form.submit(onGenClick);
   $btnDraw.click(onDrawClick);

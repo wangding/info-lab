@@ -9,8 +9,9 @@ $(function() {
   $form.submit(onTrans);
   $inputImg.click(onClick);
 
-  /* global $forkMeGH */
+  /* global $forkMeGH, $bszPageFooter */
   $forkMeGH.show('https://github.com/wangding/info-lab');
+  $bszPageFooter.show('body');
 
   function onClick() {
     outputImg.style.display = 'none';
