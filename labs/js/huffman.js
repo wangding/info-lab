@@ -16,7 +16,7 @@ const SNUM_MAX = 256,                 // 信源符号个数最多为 SNUM_MAX �
 
 let srcData = null,                   // 源文件无符号字节数组
     n       = 0,                      // 信源符号个数
-    scaled  = false,                  // 是否发生信源缩减
+//    scaled  = false,                  // 是否发生信源缩减
     srcFileName = '',                 // 信源文件名
     freq    = new Array(SNUM_MAX),    // 符号频次整型数组
     p       = new Array(SNUM_MAX),    // 符号概率浮点数组
@@ -44,6 +44,7 @@ function initData(data) {
     freq[i]    = 0;
     miniP[i]   = 0;
     miniFrq[i] = 0;
+    hfmTree[i] = { l:0, r:0, p:0, w:0 };
     hfmCode[i] = '';
   }
 
@@ -153,13 +154,12 @@ function scaleFreq() {
   for(let i=0; i<SNUM_MAX; i++) {
     if(freq[i] !== 0) {
       f = roundFractional(freq[i] / scale, 0);
-      miniFrq[i] = (f == 0) ? 1 : f;
+      miniFrq[i] = (f === 0) ? 1 : f;
     }
   }
 
   printScaleFreq();
-
-  return(scaled = true);
+  return true;
 }
 
 function printScaleFreq() {
@@ -192,8 +192,29 @@ function scaledInfoSrcAnalyze() {
   for(i=0; i<SNUM_MAX; i++) miniP[i] = roundFractional(miniFrq[i] / total, 6);
 
   miniTFq = total;
+
+  printScaledInfoSrcSum();
 }
 
+/**
+  * 打印缩减信源分析结果，缩减信源每个符号的概率、信源熵以及信源的剩余度。
+  *
+  * @returns 无
+  */
+function printScaledInfoSrcSum() {
+  let h   = entropy(miniP),       // 缩减信源的熵
+      num = 0;
+
+  printf("信源符号的概率分布：\n");
+  printf("xi    value\tp\n");
+  printf("-------------------------\n");
+  for(let i=0; i<SNUM_MAX; i++) {
+    if(freq[i] !== 0) printf(`x${++num} \t${i}\t${miniP[i]}\n`);
+  }
+  printf("-------------------------\n");
+  printf(`熵:\t\t${h} bit\n`);
+  printf(`剩余度:\t\t${redundancy(h, num)}\n\n`);
+}
 /**
   * 计算压缩文件头部存储频次表等信息的开销
   *
@@ -233,13 +254,12 @@ function storeCost() {
 }
 
 function initHfmTree() {
-  for(let i=0; i<SNUM_MAX; i++) hfmTree[i].w = freq[i];
+  for(let i=0; i<SNUM_MAX; i++) hfmTree[i].w = miniFrq[i];
 
-  console.log(HEAD);
-  for(let i=0; i<hfmTree.length; i++) console.log(`${i}\t${hfmTree[i].l}\t${hfmTree[i].r}\t${hfmTree[i].p}\t${hfmTree[i].w}`)
-  console.log(hfmTree[HEAD]);
   hfmTree[HEAD].p = EOT;
   hfmTree[HEAD].w = SNUM_MAX;
+  printf('初始化的 ');
+  printHfmTree();
 }
 
 /**
@@ -328,13 +348,12 @@ function select(s1, s2) {
 function printHfmTree() {
   let num = 0;
 
-  printf("Huffman树：\n");
+  printf("Huffman 树：\n");
   printf("xi\tpos\tweight\tl\tr\tp\n");
   printf("---------------------------------------------\n");
   for(let i=0; i<NNUM_MAX; i++) {
-    if(HfmTree[i].w != 0) {
-      printf("x%d\t%d\t%d\t%d\t%d\t%d\n", ++num, i,
-        HfmTree[i].w, HfmTree[i].l, HfmTree[i].r, HfmTree[i].p);
+    if(hfmTree[i].w != 0) {
+      printf(`x${++num}\t${i}\t${hfmTree[i].w}\t${hfmTree[i].l}\t${hfmTree[i].r}\t${hfmTree[i].p}\n`);
     }
   }
   printf("---------------------------------------------\n\n");
@@ -406,7 +425,7 @@ function compress(data, file, output) {
   if(scaleFreq())  scaledInfoSrcAnalyze();
 
   initHfmTree();
-  genHfmTree();
+  //genHfmTree();
   /*
   genHfmCode();
   writeHfmFile();
