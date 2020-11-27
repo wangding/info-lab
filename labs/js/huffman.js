@@ -8,9 +8,8 @@ const { roundFractional, entropy, redundancy } = require('./lib');
 const SNUM_MAX = 256,                 // 信源符号个数最多为 SNUM_MAX 个
       NNUM_MAX = 512,                 // 树节点个数最多为 512 个
       CHAR_BIT = 8,                   // 一个字节有 8 位
-      INT_MAX  = 2147483647,
       EOT      = -1,                  // End of Tree
-      HEAD     = NNUM_MAX - 1,        // Huffman树头节点的位置
+      HEAD     = NNUM_MAX - 1,        // Huffman 树头节点的位置，511
       HFM_FILE_TOKEN = "Hfm",         // huffman 压缩文件的前三个字节标识
       LB10     = 3.321928095;         // 以 2 为底 10 的对数
 
@@ -44,7 +43,6 @@ function initData(data) {
     freq[i]    = 0;
     miniP[i]   = 0;
     miniFrq[i] = 0;
-    hfmTree[i] = { l:0, r:0, p:0, w:0 };
     hfmCode[i] = '';
   }
 
@@ -263,7 +261,7 @@ function initHfmTree() {
 }
 
 /**
-  * 利用信源符号缩减的原理，将Huffman树各个活动叶子节点
+  * 利用信源符号缩减的原理，将 Huffman 树各个活动叶子节点
   * 与缩减的中间节点连接成一棵二叉树。
   *
   * @param 无
@@ -271,12 +269,12 @@ function initHfmTree() {
   * @returns 无
   */
 function genHfmTree() {
-  let s1 = 0, s2 = 0, s3 = 0;
+  let s3 = 0;
 
   printf("信源缩减过程：\n");
 
-  while(select(s1, s2) != 0) {
-    //_ASSERT(HfmTree[HEAD].w < NNUM_MAX);
+  do {
+    let { s1, s2 } = select();
     s3 = hfmTree[HEAD].w++;
 
     hfmTree[s3].l = s1;
@@ -285,9 +283,7 @@ function genHfmTree() {
 
     hfmTree[s1].p = s3;
     hfmTree[s2].p = s3;
-
-    // 可以在这里调试打印每一步信源缩减后的Huffman树信息
-  }
+  } while(s2 !== HEAD)
 
   printf("\n生成的");
   printHfmTree();
@@ -299,43 +295,39 @@ function genHfmTree() {
   * 中间节点，最后权重需要满足下面的不等式：
   *   weight(s1) <= weight(s2) <= weight(other node)。
   *
-  * @param s1    第一个节点的下标
-  *        s2    第二个节点的下标
-  *
-  * @returns {boolean} 选择是否成功
-  *   1    成功
-  *   0    失败，只剩下一个满足条件的活动节点了
+  * @return s1    第一个节点的下标
+  *         s2    第二个节点的下标
   */
-function select(s1, s2) {
+function select() {
   const num = hfmTree[HEAD].w;
-  let minWeight = INT_MAX;
+  let minWeight = Infinity;
 
   s1 = s2 = HEAD;
   for(let i=0; i<num; i++) {
-    if((hfmTree[i].w < minWeight)    /* HfmTree[i]的权重最小 */
-      && (hfmTree[i].w != 0)         /* HfmTree[i]是活动节点 */
-      && (hfmTree[i].p == 0))        /* HfmTree[i]是孤立节点 */
+    if((hfmTree[i].w < minWeight)     /* HfmTree[i] 的权重最小 */
+      && (hfmTree[i].w !== 0)         /* HfmTree[i] 是活动节点 */
+      && (hfmTree[i].p === 0))        /* HfmTree[i] 是孤立节点 */
     {
       minWeight = hfmTree[i].w;
       s1 = i;
     }
   }
 
-  minWeight = INT_MAX;
+  minWeight = Infinity;
   for(let i=0; i<num; i++) {
-    if((hfmTree[i].w < minWeight)    /* HfmTree[i]的权重最小 */
-      && (hfmTree[i].w != 0)      /* HfmTree[i]是活动节点 */
-      && (hfmTree[i].p == 0)      /* HfmTree[i]是孤立节点 */
-      && (i != s1))          /* *s2 <> *s1      */
+    if((hfmTree[i].w < minWeight)     /* HfmTree[i]的权重最小 */
+      && (hfmTree[i].w !== 0)         /* HfmTree[i]是活动节点 */
+      && (hfmTree[i].p === 0)         /* HfmTree[i]是孤立节点 */
+      && (i !== s1))                  /* s2 <> s1             */
     {
       minWeight = hfmTree[i].w;
       s2 = i;
     }
   }
 
-  printf("s1 = %3d,   s2 = %3d,   s3 = %3d\n", s1, s2, num);
+  printf(`s1 = ${s1}  \ts2 = ${s2}  \ts3 = ${num}\n`);
 
-  return(((s2 == HEAD) && (s1 == num-1)) ? 0 : 1);
+  return {s1, s2};
 }
 
 /**
@@ -425,7 +417,7 @@ function compress(data, file, output) {
   if(scaleFreq())  scaledInfoSrcAnalyze();
 
   initHfmTree();
-  //genHfmTree();
+  genHfmTree();
   /*
   genHfmCode();
   writeHfmFile();
