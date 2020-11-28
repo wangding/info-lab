@@ -273,8 +273,10 @@ function genHfmTree() {
 
   printf("信源缩减过程：\n");
 
-  do {
+  while(true) {
     let { s1, s2 } = select();
+    if(s2 === HEAD) break;
+
     s3 = hfmTree[HEAD].w++;
 
     hfmTree[s3].l = s1;
@@ -283,9 +285,9 @@ function genHfmTree() {
 
     hfmTree[s1].p = s3;
     hfmTree[s2].p = s3;
-  } while(s2 !== HEAD)
+  }
 
-  printf("\n生成的");
+  printf("\n生成的 ");
   printHfmTree();
 }
 
@@ -344,7 +346,7 @@ function printHfmTree() {
   printf("xi\tpos\tweight\tl\tr\tp\n");
   printf("---------------------------------------------\n");
   for(let i=0; i<NNUM_MAX; i++) {
-    if(hfmTree[i].w != 0) {
+    if(hfmTree[i].w !== 0) {
       printf(`x${++num}\t${i}\t${hfmTree[i].w}\t${hfmTree[i].l}\t${hfmTree[i].r}\t${hfmTree[i].p}\n`);
     }
   }
@@ -352,9 +354,71 @@ function printHfmTree() {
 }
 
 /**
+  * 利用 Huffman 树为每个信源符号生成相应的码字。每个信源
+  * 符号都是 Huffman 树的活动叶子节点，从叶子节点向根节点
+  * 行进路径就是分配码元符号，产生编码的过程。中间节点的
+  * 左分支分配码元符号'1'，右分支分配码元符号'0'。码字的
+  * 实际顺序与此过程正好相反，因此需要有一个反转的操作。
+  *
+  * @param 无
+  *
+  * @returns 无
+  */
+function genHfmCode() {
+  for(let i=0; i<SNUM_MAX; i++) {
+    let pos,
+        code = '',
+        pHfmCode = null,
+        node = null;
+
+    if(hfmTree[i].p === 0) continue;    // 不是叶子节点继续
+    node = hfmTree[i];
+    pos  = i;
+
+    // 生成码字，从叶子节点往根节点走
+    while(node.p !== 0) {             // NOT_TOUCH_ROOT
+      code += ((hfmTree[node.p].l === pos) ? '1' : '0');
+      pos = node.p;                   // MOVE_TO_ROOT
+      node = hfmTree[pos];
+    }
+
+    // 反转码字，码字从根节点到叶子节点
+    hfmCode[i] = code.split('').reverse().join('')
+  }
+
+  printHfmCode();
+}
+
+/**
+  * 打印 Huffman 编码生成的码字。
+  *
+  * @param 无
+  *
+  * @returns 无
+  */
+function printHfmCode() {
+  let num = 0, avgLen = 0;
+
+  printf("码字：\n");
+  printf("xi\tpos\tfreq\tlen\tCode\n");
+  printf("---------------------------------------------\n");
+  for(let i=0; i<SNUM_MAX; i++) {
+    if(freq[i] !== 0) {     // 是信源符号
+      num++;
+      avgLen += p[i] * hfmCode[i].length;
+      printf(`x${num}\t${i}\t${miniFrq[i]}\t${hfmCode[i].length}\t${hfmCode[i]}\n`);
+    }
+  }
+  printf("---------------------------------------------\n");
+  printf(`平均码长：\t${roundFractional(avgLen, 3)}\n`);
+  printf(`编码效率：\t${roundFractional(100 * entropy(p) / avgLen, 2)} %\n`);
+  printf(`理论压缩率：\t${roundFractional(100.0 * avgLen / CHAR_BIT, 2)} %\n\n`);
+}
+
+/**
   * 将信源文件打包。因为对信源文件的压缩不足以抵消存储
   * 频次表的开销，因此不压缩信源文件，仅仅将其封装。即
-  * 仅仅加上Huffman文件头标识符，其他部分与信源文件的每
+  * 仅仅加上 Huffman 文件头标识符，其他部分与信源文件的每
   * 个字节都完全相同。
   *
   * @param 无
@@ -418,10 +482,8 @@ function compress(data, file, output) {
 
   initHfmTree();
   genHfmTree();
-  /*
   genHfmCode();
-  writeHfmFile();
-  */
+  //writeHfmFile();
 }
 
 function decompress(data, output) {
