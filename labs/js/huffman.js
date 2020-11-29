@@ -17,6 +17,7 @@ let srcData = null,                   // 源文件无符号字节数组
     n       = 0,                      // 信源符号个数
 //    scaled  = false,                  // 是否发生信源缩减
     srcFileName = '',                 // 信源文件名
+    dstFileName = '',                 // 压缩文件名
     freq    = new Array(SNUM_MAX),    // 符号频次整型数组
     p       = new Array(SNUM_MAX),    // 符号概率浮点数组
     miniFrq = new Array(SNUM_MAX),    // 缩减后符号频次整型数组
@@ -454,6 +455,96 @@ function getDstFileName() {
 }
 
 /**
+  * 写 Huffman 压缩文件的头信息，包括三部分：文件标识符、
+  * FLAG和频次表。频次表的存储有两种方式，行程长度存储
+  * 和连续存储。
+  *
+  * @param 无
+  *
+  * @returns 无
+  */
+function writeHfmFileHead() {
+  int secNum = 0;
+  unsigned char flag = 0;
+
+  // 写 Huffman 文件标识符
+  fwrite(&HFM_FILE_TOKEN, sizeof(char), strlen(HFM_FILE_TOKEN), fpDst);
+
+  if((secNum = SuitRunLen()) != 0) {
+    flag = 0x40;      // 第7位置0，代表对信源文件进行压缩
+                // 第6位置1，代表采用行程方式存储频次
+    fputc(flag, fpDst);
+    SaveFrqRunLen(fpDst, secNum);
+  } else {
+    flag = 0x00;      // 第7位置0，代表对信源文件进行压缩
+                // 第6位置0，代表采用顺序方式存储频次
+    fputc(flag, fpDst);
+    SaveFrqSerial(fpDst);
+  }
+}
+
+/**
+  * 打印压缩结果。包括信源文件长度，目标文件长度和压缩率。
+  *
+  * @param flenSrc    信源文件长度
+  *        flenDst    目标文件长度
+  *
+  * @returns 无
+  */
+function printResult(flenSrc, flenDst) {
+  printf("\n\n压缩结果：\n");
+  printf("---------------------------------------------\n");
+  printf(`原始文件：\t${srcFileName}\t${flenSrc} 字节\n`);
+  printf(`目标文件：\t${dstFileName}\t${flenDst} 字节\n`);
+  printf("---------------------------------------------\n");
+  printf(`压缩率：\t${flenDst * 100 / flenSrc} %\n`);
+}
+
+/**
+  * 利用信源符号对应的码字，对信源文件重新编码，实现压缩。
+  *
+  * @param data 信源文件的字节数组
+  *
+  * @returns 无
+  */
+function writeHfmFile() {
+  let ch = 0;
+  unsigned int  len = 0U;
+  unsigned char buf = 0x00;
+  const unsigned char mask = 0x80;
+  FILE *fpSrc = NULL, *fpDst = NULL;
+
+  writeHfmFileHead(fpDst);
+
+  while((ch=fgetc(fpSrc)) != EOF) {      // 写压缩文件编码主体
+    for(let i=0; hfmCode[ch][i] != EOS; i++) {
+      if(HfmCode[ch][i] == '1')  buf |= mask >> len;
+
+      if(len == (CHAR_BIT - 1)) {
+        fputc(buf, fpDst);
+        len = -1;
+        buf = 0x00;
+      }
+
+      len++;
+    }
+  }
+
+  _ASSERT(len != -1);
+
+  if(len != 0) { // buf没有填充完毕，写压缩文件的最后一个字节
+    fputc(buf, fpDst);
+    fseek(fpDst, strlen(HFM_FILE_TOKEN), SEEK_SET);
+    buf = fgetc(fpDst) + len;
+    fseek(fpDst, strlen(HFM_FILE_TOKEN), SEEK_SET);
+    fputc(buf, fpDst);
+    fseek(fpDst, 0, SEEK_END);
+  }
+
+  printResult(ftell(fpSrc), ftell(fpDst));
+}
+
+/**
   * 对信源文件做 Huffman 压缩编码
   *
   * @param data 信源文件的字节数组
@@ -483,11 +574,7 @@ function compress(data, file, output) {
   initHfmTree();
   genHfmTree();
   genHfmCode();
-  //writeHfmFile();
-}
-
-function decompress(data, output) {
-  // 解压缩
+  writeHfmFile();
 }
 
 function main() {
