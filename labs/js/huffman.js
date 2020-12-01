@@ -21,10 +21,12 @@ let srcData = null,                   // 源文件无符号字节数组
     sfLen       = 0,                  // 信源文件长度，单位字节
     dfLen       = 0,                  // 目标文件长度，单位字节
     freq    = new Array(SNUM_MAX),    // 符号频次整型数组
+    frqMode = 0;                      // 频次存储方式，0 代表顺序存储，1 代表成对存储，2 代表行程存储
     p       = new Array(SNUM_MAX),    // 符号概率浮点数组
     miniFrq = new Array(SNUM_MAX),    // 缩减后符号频次整型数组
     miniP   = new Array(SNUM_MAX),    // 缩减后符号概率浮点数组
     miniTFq = 0,                      // 缩减后符号频次总和
+    runLen  = [],                     // 行程信息
     hfmTree = new Array(NNUM_MAX),    // Huffman 结点数组
     hfmCode = new Array(SNUM_MAX);    // Huffman 码字字符串数组
 
@@ -39,6 +41,7 @@ let $output;                          // 用来打印输出的 DOM 对象
   * @returns 无
   */
 function initData(data) {
+  sfLen   = data.length;
   srcData = data;     // 信源文件的字节数组
 
   for(let i=0; i<SNUM_MAX; i++)  {
@@ -84,6 +87,33 @@ function printFreq() {
   printf(`频次合计:\t${total}\n\n`);
 }
 
+/**
+  * 打印输出行程段信息
+  *
+  * @returns 无
+  */
+function printRunLen() {
+  printf("i\tstart\tlen\n");
+  printf('-------------------------\n');
+  for(let i=0; i<runLen.length; i++) {
+    printf(`${i}\t${runLen[i].pos}\t${runLen[i].len}\n`);
+  }
+  printf('-------------------------\n\n');
+}
+
+/**
+  * 打印输出行程段分析信息
+  *
+  * @returns 无
+  */
+function printRunLenAnalysis() {
+  printf("i\tpos1\tlen\tpos2\tdistance\n");
+  printf('------------------------------------\n');
+  for(let i=0; i<runLen.length-1; i++) {
+    printf(`${i}\t${runLen[i].pos}\t${runLen[i].len}\t${runLen[i+1].pos}\t${runLen[i+1].pos - runLen[i].pos - runLen[i].len}\n`);
+  }
+  printf('------------------------------------\n\n');
+}
 /**
   * 打印输出信息
   *
@@ -228,29 +258,58 @@ function storeCost() {
   // 3. 频次缩减小于 1 的，直接设为 1
 
   // 码表的存储方案有三种：
-  // 1. 按位存储，每个信源符号，的频次保存在该符号 ASCII 值所在的数组位置
+  // 1. 按位存储，每个信源符号，的频次保存在该符号 ASCII 值所在的数组位置，frqMode = 0
   //    这种方式，存储机制简单，消耗存储空间为固定的 256 字节
-  // 2. 按行程存储，信源符号 ASCII 值连续的符号，组成一个行程段
+  // 2. 按行程存储，信源符号 ASCII 值连续的符号，组成一个行程段，frqMode = 2
   //    每个行程段的存储方式为：[START][LENGTH][...]
   //    [START] 是行程段中 ASCII 值最小的信源符号其 ASCII 值，占一个字节
   //    [LENGTH] 是行程段中 ASCII 值连续的符号个数，占一个字节
   //    [...] 是该行程段中按 ASCII 值从小到大，每个信源符号的频次
   //    这样保存的码表消耗的存储空间为：secNum * 2 + n 字节
   //    其中：secNum 是行程段数，n 为信源符号个数
-  // 3. 配对存储，存储方式为：[SYMBOL][FREQUENCE]
+  // 3. 配对存储，存储方式为：[SYMBOL][FREQUENCE]，frqMode = 1
   //    [SYMBOL] 是信源符号的 ASCII 值，占一个字节
   //    [REQUENCE] 是信源符号的频次，占一个字节
   //    这样保存的码表消耗的存储空间为：2 * n 字节
 
   // 三种存储方案，应选择占用空间最小的存储方案
 
-  let freqNew = freq.map(f => f === 0 ? 'x' : 1);
-  let str = freqNew.join('');
-  let secNum = str.match(/\d+/g).length;    // 行程段的数量
+  let str = freq.map(f => f === 0 ? 'x' : 1).join('');
+  let sec = str.match(/\d+/g);
+
+  for(let i=0, pos=0, len=0; i<sec.length; i++, pos+=len) {
+    pos = str.indexOf('1', pos);
+    len = sec[i].length;
+    runLen.push({ pos, len});
+  }
+
+  printf('原始行程信息：\n');
+  printRunLen();
+  printf('原始行程分析：\n');
+  printRunLenAnalysis();
+
+  // 两个行程段间距小于等于 2 的进行合并
+  for(let i=0; i<runLen.length-1; i++) {
+    let distance = runLen[i+1].pos - runLen[i].pos - runLen[i].len;
+    if(distance < 3) {
+      runLen[i].len += distance + runLen[i+1].len;
+      runLen.splice(i+1, 1);
+      i--;
+    }
+  }
+
+  printf('合并后行程信息：\n');
+  printRunLen();
+  printf('合并后行程分析：\n');
+  printRunLenAnalysis();
+
+  let cost = [SNUM_MAX, 2 * n, 2 * runLen.length + n];
 
   // 三种存储方案的存储总开销，取最小值
-  let size = Math.min(SNUM_MAX, 2 * secNum + n, 2 * n) + HFM_FILE_TOKEN.length + 1;
+  let size = Math.min(...cost) + HFM_FILE_TOKEN.length + 1;
+  frqMode = cost.indexOf(size-4);
   printf(`文件头部存储开销：${size} 字节\n\n`);
+
   return(size);
 }
 
@@ -441,7 +500,6 @@ function wrapSrcFile() {
 
   for(let i=4; i<len; i++) data[i] = srcData[i-4];
 
-  sfLen = srcData.length;
   dfLen = data.length;
 
   writeFile(data);
@@ -463,45 +521,45 @@ function getDstFileName() {
   * FLAG和频次表。频次表的存储有两种方式，行程长度存储
   * 和连续存储。
   *
-  * @param 无
+  * @param data 压缩文件内容的字节数组
   *
   * @returns 无
   */
-function writeHfmFileHead() {
-  let secNum = 0, flag = 0;
-
+function writeHfmFileHead(data) {
   // 写 Huffman 文件标识符
-  //fwrite(&HFM_FILE_TOKEN, sizeof(char), strlen(HFM_FILE_TOKEN), fpDst);
+  data[0] = HFM_FILE_TOKEN.charCodeAt(0);
+  data[1] = HFM_FILE_TOKEN.charCodeAt(1);
+  data[2] = HFM_FILE_TOKEN.charCodeAt(2);
 
-  /*
-  if((secNum = SuitRunLen()) != 0) {
-    flag = 0x40;      // 第 7 位置 0，代表对信源文件进行压缩
-                      // 第 6 位置 1，代表采用行程方式存储频次
-    fputc(flag, fpDst);
-    SaveFrqRunLen(fpDst, secNum);
-  } else {
-    flag = 0x00;      // 第 7 位置 0，代表对信源文件进行压缩
-                      // 第 6 位置 0，代表采用顺序方式存储频次
-    fputc(flag, fpDst);
-    SaveFrqSerial(fpDst);
-  }*/
-}
+  if(frqMode === 0) { // 顺序存储码表
+    data[3] = 0x80;   // 第 7 位置 1，代表对信源文件进行压缩
+                      // 第 6, 5 位置 00，代表采用顺序存储
+    for(let i=0; i<SNUM_MAX; i++) data[i+4] = miniFrq[i];
+    return;
+  }
 
-/**
-  * 打印压缩结果。包括信源文件长度，目标文件长度和压缩率。
-  *
-  * @param flenSrc    信源文件长度
-  *        flenDst    目标文件长度
-  *
-  * @returns 无
-  */
-function printResult(flenSrc, flenDst) {
-  printf('\n\n压缩结果：\n');
-  printf('---------------------------------------------\n');
-  printf(`原始文件：\t${srcFileName}\t${flenSrc} 字节\n`);
-  printf(`目标文件：\t${dstFileName}\t${flenDst} 字节\n`);
-  printf('---------------------------------------------\n');
-  printf(`压缩率：\t${flenDst * 100 / flenSrc} %\n`);
+  if(frqMode === 1) { // 成对存储码表
+    data[3] = 0xa0;   // 第 7 位置 1，代表对信源文件进行压缩
+                      // 第 6, 5 位置 01，代表采用成对存储
+    for(let i=0, pos=4; i<SNUM_MAX; i++) {
+      if(miniFrq[i] !== 0) {
+        data[pos++] = i;
+        data[pos++] = miniFrq[i];
+      }
+    }
+    return;
+  }
+
+  if(frqMode === 2) { // 行程存储码表
+    data[3] = 0xc0;   // 第 7 位置 1，代表对信源文件进行压缩
+                      // 第 6, 5 位置 10，代表采用行程存储
+    for(let i=0, pos=4; i<runLen.length; i++) {
+      data[pos++] = runLen[i].pos;
+      data[pos++] = runLen[i].len;
+
+      for(let j=0; j<runLen[i].len; j++, pos++) data[pos] = miniFrq[runLen[i].pos+j];
+    }
+  }
 }
 
 /**
@@ -512,14 +570,16 @@ function printResult(flenSrc, flenDst) {
   * @returns 无
   */
 function writeHfmFile() {
-  /*
   let ch = 0;
+  let data = new Array(sfLen);  // 这个长度有些大，看看怎么优化一下
+  data.fill(0);
+
+  writeHfmFileHead(data);
+  /*
   unsigned int  len = 0U;
   unsigned char buf = 0x00;
   const unsigned char mask = 0x80;
   FILE *fpSrc = NULL, *fpDst = NULL;
-
-  writeHfmFileHead(fpDst);
 
   while((ch=fgetc(fpSrc)) != EOF) {      // 写压缩文件编码主体
     for(let i=0; hfmCode[ch][i] != EOS; i++) {
@@ -581,6 +641,17 @@ function compress(data, file, output) {
   writeHfmFile();
 }
 
+function main() {
+  const fs = require('fs'),
+        // fname = 'test.bin';
+        fname = 'test.txt';
+
+  compress(fs.readFileSync(fname), fname);
+  report();
+}
+
+main();
+
 /**
   * 打印报告。包括：信源分析、编码信息以及压缩效果。
   *
@@ -622,15 +693,5 @@ function report() {
   printf(`压缩率：\t${roundFractional(dfLen * 100 / sfLen, 2)}%\n`);
 }
 
-function main() {
-  const fs = require('fs'),
-        // fname = 'test.bin';
-        fname = 'test.txt';
-
-  compress(fs.readFileSync(fname), fname);
-  report();
-}
-
-main();
 //  return { compress, decompress };
 //})();
