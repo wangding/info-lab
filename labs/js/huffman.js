@@ -26,6 +26,7 @@ let srcData = null,                   // 源文件无符号字节数组
     miniFrq = new Array(SNUM_MAX),    // 缩减后符号频次整型数组
     miniP   = new Array(SNUM_MAX),    // 缩减后符号概率浮点数组
     miniTFq = 0,                      // 缩减后符号频次总和
+    headSize= 0,                      // 压缩文件头字节数
     runLen  = [],                     // 行程信息
     hfmTree = new Array(NNUM_MAX),    // Huffman 结点数组
     hfmCode = new Array(SNUM_MAX);    // Huffman 码字字符串数组
@@ -303,7 +304,11 @@ function storeCost() {
   printf('合并后行程分析：\n');
   printRunLenAnalysis();
 
-  let cost = [SNUM_MAX, 2 * n, 2 * runLen.length + n];
+  let runLenCost = 0;
+
+  runLenCost = runLen.reduce((w, v) => w += v.len, 0) + runLen.length * 2;
+
+  let cost = [SNUM_MAX, 2 * n, runLenCost];
 
   // 三种存储方案的存储总开销，取最小值
   let size = Math.min(...cost) + HFM_FILE_TOKEN.length + 1;
@@ -570,42 +575,32 @@ function writeHfmFileHead(data) {
   * @returns 无
   */
 function writeHfmFile() {
-  let ch = 0;
-  let data = new Array(sfLen);  // 这个长度有些大，看看怎么优化一下
+  let data = new Uint8Array(sfLen);  // 这个长度有些大，看看怎么优化一下
   data.fill(0);
 
   writeHfmFileHead(data);
-  /*
-  unsigned int  len = 0U;
-  unsigned char buf = 0x00;
-  const unsigned char mask = 0x80;
-  FILE *fpSrc = NULL, *fpDst = NULL;
 
-  while((ch=fgetc(fpSrc)) != EOF) {      // 写压缩文件编码主体
-    for(let i=0; hfmCode[ch][i] != EOS; i++) {
-      if(HfmCode[ch][i] == '1')  buf |= mask >> len;
+  let buf = '', pos = headSize, code = '';
+  for(let i=0; i<sfLen; i++) {
+    buf += hfmCode[srcData[i]];
 
-      if(len == (CHAR_BIT - 1)) {
-        fputc(buf, fpDst);
-        len = -1;
-        buf = 0x00;
-      }
-
-      len++;
+    while(buf.length >= 8) {
+      code = buf.substr(0, 8);
+      data[pos++] = code.split('').reduce((m, v, i) => m += v * Math.pow(2, 7-i), 0);
+      buf = buf.slice(8, buf.length);
     }
   }
 
-  if(len != 0) { // buf没有填充完毕，写压缩文件的最后一个字节
-    fputc(buf, fpDst);
-    fseek(fpDst, strlen(HFM_FILE_TOKEN), SEEK_SET);
-    buf = fgetc(fpDst) + len;
-    fseek(fpDst, strlen(HFM_FILE_TOKEN), SEEK_SET);
-    fputc(buf, fpDst);
-    fseek(fpDst, 0, SEEK_END);
+  if(buf !== '') {
+    pos++;
+    data[4] += buf.length;
+    code = (buf + '00000000').substr(0, 8);
+    data[pos++] = code.split('').reduce((m, v, i) => m += v * Math.pow(2, 7-i), 0);
   }
 
-  printResult(ftell(fpSrc), ftell(fpDst));
-  */
+  data  = data.slice(0, pos);
+  dfLen = pos;
+  writeFile(data);
 }
 
 /**
@@ -626,7 +621,8 @@ function compress(data, file, output) {
   let h       = entropy(p),
       flenSrc = srcData.length;
 
-  let notNeedCompress = (flenSrc - flenSrc * h / CHAR_BIT) < storeCost();
+  headSize = storeCost();
+  let notNeedCompress = (flenSrc - flenSrc * h / CHAR_BIT) < headSize;
 
   if(notNeedCompress) {
     wrapSrcFile();
