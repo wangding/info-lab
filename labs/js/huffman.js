@@ -529,10 +529,10 @@ function wrapSrcFile() {
   writeFile(data);
 }
 
-function writeFile(data) {
+function writeFile(data, fileName) {
   const fs = require('fs');
 
-  dstFileName = getDstFileName();
+  dstFileName = fileName || getDstFileName();
   fs.writeFileSync(dstFileName, data, 'binary');
 }
 
@@ -658,13 +658,82 @@ function compress(data, file, output) {
   writeHfmFile();
 }
 
+/**
+  * 判断是否为合法的Huffman压缩文件。
+  *
+  * @param 无
+  *
+  * @returns bool true 合法，false 非法
+  */
+function isHFMFile() {
+  let token = '';
+
+  for(let i=0; i<3; i++) token += String.fromCharCode(srcData[i]);
+
+  return token === HFM_FILE_TOKEN;
+}
+
+/**
+  * Huffman 解压缩
+  *
+  * @param data 信源文件的字节数组
+  *
+  * @returns 无
+  */
+function decompress(data, file, output) {
+  srcData = data;
+
+  if(!isHFMFile()) {
+    printf(`${file} 压缩文件格式不正确！\n`);
+    return;
+  }
+
+  let flag    = srcData[3],
+      okFlags = [0x00, 0x80, 0xA0, 0xC0], // 合法的 falg 高四位
+      mask    = 0xf0;                     // 取高四位的掩码
+
+  // 对 FLAG 字段进行合法性校验，参考设计文档
+  flag &= mask;
+
+  console.log(flag);
+  process.exit();
+  if(okFlags.indexOf(flag) === -1) {
+    printf(`${file} 压缩文件格式不正确！\n`);
+    return;
+  }
+
+  if(flag === 0x00) {        // 信源文件没有被压缩
+    srcData = srcData.slice(4, srcData.length);
+    writeFile(srcData, 'test2.bin');
+    return;
+  }
+
+  process.exit();
+
+/*
+  if(ReadFrq(fpSrc, ch) == 0) {      // 频次读取错误的处理
+    fclose(fpSrc);
+    fclose(fpDst);
+    remove(dstFile);
+    exit(-1);
+  }
+
+  InfoSrcAnalyze();
+  InitHfmTree();
+  GenHfmTree();
+  GenHfmCode();
+  DecodeFile(fpSrc, fpDst);
+*/
+}
+
 function main() {
   const fs = require('fs'),
-        // fname = 'test.bin';
-        fname = 'test.txt';
+        //fname = 'test.bin';
+        fname = 'test.hfm';
 
-  compress(fs.readFileSync(fname), fname);
-  report();
+  //compress(fs.readFileSync(fname), fname);
+  decompress(fs.readFileSync(fname), fname);
+  //report();
 }
 
 main();
