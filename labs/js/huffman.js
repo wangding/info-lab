@@ -94,12 +94,12 @@ function printFreq() {
   * @returns 无
   */
 function printRunLen() {
-  printf("i\tstart\tlen\n");
+  printf('i\tstart\tlen\n');
   printf('-------------------------\n');
   for(let i=0; i<runLen.length; i++) {
     printf(`${i}\t${runLen[i].pos}\t${runLen[i].len}\n`);
   }
-  printf('-------------------------\n\n');
+  printf('-------------------------\n');
 }
 
 /**
@@ -108,12 +108,12 @@ function printRunLen() {
   * @returns 无
   */
 function printRunLenAnalysis() {
-  printf("i\tpos1\tlen\tpos2\tdistance\n");
-  printf('------------------------------------\n');
+  printf('i\tpos1\tlen\tpos2\tdistance\n');
+  printf('----------------------------------------\n');
   for(let i=0; i<runLen.length-1; i++) {
     printf(`${i}\t${runLen[i].pos}\t${runLen[i].len}\t${runLen[i+1].pos}\t${runLen[i+1].pos - runLen[i].pos - runLen[i].len}\n`);
   }
-  printf('------------------------------------\n\n');
+  printf('----------------------------------------\n\n');
 }
 /**
   * 打印输出信息
@@ -286,7 +286,7 @@ function storeCost() {
 
   printf('原始行程信息：\n');
   printRunLen();
-  printf('原始行程分析：\n');
+  printf('\n原始行程分析：\n');
   printRunLenAnalysis();
 
   // 两个行程段间距小于等于 2 的进行合并
@@ -299,14 +299,17 @@ function storeCost() {
     }
   }
 
-  printf('合并后行程信息：\n');
-  printRunLen();
-  printf('合并后行程分析：\n');
-  printRunLenAnalysis();
-
   let runLenCost = 0;
 
-  runLenCost = runLen.reduce((w, v) => w += v.len, 0) + runLen.length * 2;
+  runLenCost = runLen.reduce((w, v) => w += v.len, 0);
+
+  printf('合并后行程信息：\n');
+  printRunLen();
+  printf(`行程段数：\t${runLen.length}\n频次总数：\t${runLenCost}\n\n`);
+  runLenCost += runLen.length * 2;
+
+  printf('合并后行程分析：\n');
+  printRunLenAnalysis();
 
   let cost = [SNUM_MAX, 2 * n, runLenCost];
 
@@ -325,6 +328,22 @@ function initHfmTree() {
   hfmTree[HEAD].w = SNUM_MAX;
   printf('初始化的 ');
   printHfmTree();
+}
+
+/**
+  * 打印压缩结果。包括信源文件长度，目标文件长度和压缩率。
+  *
+  * @param 无
+  *
+  * @returns 无
+  */
+function printResult() {
+  printf('\n\n压缩结果：\n');
+  printf('---------------------------------------------\n');
+  printf(`原始文件：\t${srcFileName}\t${sfLen} 字节\n`);
+  printf(`目标文件：\t${dstFileName}\t${dfLen} 字节\n`);
+  printf('---------------------------------------------\n');
+  printf(`压缩率：\t${roundFractional(dfLen * 100 / sfLen, 2)} %\n`);
 }
 
 /**
@@ -601,6 +620,8 @@ function writeHfmFile() {
   data  = data.slice(0, pos);
   dfLen = pos;
   writeFile(data);
+
+  printResult();
 }
 
 /**
