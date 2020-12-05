@@ -10,35 +10,32 @@ const SNUM_MAX = 256,                 // 信源符号个数最多为 SNUM_MAX �
       CHAR_BIT = 8,                   // 一个字节有 8 位
       EOT      = -1,                  // End of Tree
       HEAD     = NNUM_MAX - 1,        // Huffman 树头节点的位置，511
-      HFM_FILE_TOKEN = 'Hfm',         // huffman 压缩文件的前三个字节标识
-      LB10     = 3.321928095;         // 以 2 为底 10 的对数
+      HFM_FILE_TOKEN = 'Hfm';         // huffman 压缩文件的前三个字节标识
 
-let srcData = null,                   // 源文件无符号字节数组
-    n       = 0,                      // 信源符号个数
+const p       = new Array(SNUM_MAX),  // 符号概率表
+      freq    = new Array(SNUM_MAX),  // 符号频次表
+      hfmCode = new Array(SNUM_MAX);  // Huffman 码字字符串数组
+      hfmTree = new Array(NNUM_MAX),  // Huffman 结点数组
+      runLen  = [];                   // 行程信息 {pos, len}，pos, 行程段起始位置，len, 行程段长度
+
+let srcData     = null,               // 源文件无符号字节数组
+    symNum      = 0,                  // 信源符号个数
     srcFileName = '',                 // 信源文件名
     dstFileName = '',                 // 压缩文件名
+    H           = 0,                  // 信源熵
     sfLen       = 0,                  // 信源文件长度，单位字节
     dfLen       = 0,                  // 目标文件长度，单位字节
-    freq    = new Array(SNUM_MAX),    // 符号频次表
-    frqMode = 0;                      // 频次存储方式，0 代表顺序存储，1 代表成对存储，2 代表行程存储
-    p       = new Array(SNUM_MAX),    // 符号概率表
-    miniP   = new Array(SNUM_MAX),    // 缩减后符号概率表
-    miniTFq = 0,                      // 缩减后符号频次总和
-    headSize= 0,                      // 压缩文件头字节数
-    runLen  = [],                     // 行程信息 { pos, len }
-                                      // pos, 行程段起始位置
-                                      // len, 行程段长度
-    hfmTree = new Array(NNUM_MAX),    // Huffman 结点数组
-    hfmCode = new Array(SNUM_MAX);    // Huffman 码字字符串数组
-
-let $output;                          // 用来打印输出的 DOM 对象
+    frqMode     = 0;                  // 频次存储方式，0 代表顺序存储，1 代表成对存储，2 代表行程存储
+    totalFrq    = 0,                  // 符号频次总和
+    headSize    = 0,                  // 压缩文件头字节数
+    $output     = null;               // 用来打印输出的 DOM 对象
 
 /**
-  * 初始化全局数据，包括：频次数组、概率数组、Huffman树
+  * 初始化全局数据，包括：频次数组、概率数组、Huffman 树
   * 的节点数组以及码字数组
   *
-  * @param data 信源文件的字节数组
-  *        file 信源文件名
+  * @param {Uint8Array} data 信源文件的字节数组
+  *        {String}     file 信源文件名
   *
   * @returns 无
   */
@@ -49,184 +46,84 @@ function initData(data, file) {
 
   p.fill(0);
   freq.fill(0);
-  miniP.fill(0);
   hfmCode.fill('');
 
-  for(let i=0; i<NNUM_MAX; i++) hfmTree[i] = { l: 0, r: 0, p: 0, w: 0 };
+  for(let i=0; i<NNUM_MAX; i++) hfmTree[i] = {l: 0, r: 0, p: 0, w: 0};
 }
 
 /**
   * 统计信源文件中每个符号出现的频次
   *
+  * @param 无
+  *
   * @returns 无
   */
 function statFreq() {
-  for(let i=0; i<srcData.length; i++) freq[srcData[i]]++;
+  srcData.forEach(data => freq[data]++);
   printFreq();
 }
 
 /**
   * 打印输出信源文件中每个符号出现的频次
   *
+  * @param 无
+  *
   * @returns 无
   */
 function printFreq() {
+  let num = 0;
+
   printf('信源符号的频次：\n');
   printf('xi    value\tfreq\n');
   printf('-------------------------\n');
-  for(let i=0, num=0; i<SNUM_MAX; i++) {
-    if(freq[i] !== 0) {
-      printf(`x${++num} \t${i}\t${freq[i]}\n`);
-    }
+  for(let i=0; i<SNUM_MAX; i++) {
+    totalFrq += freq[i];
+    (freq[i] !== 0) && printf(`x${++num} \t${i}\t${freq[i]}\n`);
   }
+  symNum = num;
   printf('-------------------------\n');
-  printf(`频次合计:\t${miniTFq}\n\n`);
-}
-
-/**
-  * 打印输出行程段信息
-  *
-  * @returns 无
-  */
-function printRunLen() {
-  printf('i\tstart\tlen\n');
-  printf('-------------------------\n');
-  for(let i=0; i<runLen.length; i++) {
-    printf(`${i}\t${runLen[i].pos}\t${runLen[i].len}\n`);
-  }
-  printf('-------------------------\n');
-}
-
-/**
-  * 打印输出行程段分析信息
-  *
-  * @returns 无
-  */
-function printRunLenAnalysis() {
-  printf('i\tpos1\tlen\tpos2\tdistance\n');
-  printf('----------------------------------------\n');
-  for(let i=0; i<runLen.length-1; i++) {
-    printf(`${i}\t${runLen[i].pos}\t${runLen[i].len}\t${runLen[i+1].pos}\t${runLen[i+1].pos - runLen[i].pos - runLen[i].len}\n`);
-  }
-  printf('----------------------------------------\n\n');
-}
-/**
-  * 打印输出信息
-  *
-  * @returns 无
-  */
-// function printf(data) {
-//   $output.append(data);
-// }
-
-function printf(data) {
-  process.stdout.write(data);
+  printf(`频次合计:\t${totalFrq}\n\n`);
 }
 
 /**
   * 信源文件分析——计算信源文件每个符号的概率
   *
+  * @param 无
+  *
   * @returns 无
   */
 function infoSrcAnalyze() {
-  for(let i=0; i<SNUM_MAX; i++) {
-    if(freq[i] === 0) continue;
-    p[i] = roundFractional(freq[i] / miniTFq, 6);
-    ++n;
-  }
+  for(let i=0; i<SNUM_MAX; i++) p[i] = roundFractional(freq[i] / totalFrq, 6);
 
+  H = entropy(p);       // 信源熵
   printInfoSrcSum();
 }
 
 /**
-  * 打印信源文件分析结果，信源文件每个符号的概率、信源熵以及信源的剩余度。
+  * 打印信源文件分析结果，信源文件每个符号的概率、信源熵以及信源的剩余度
+  *
+  * @param 无
   *
   * @returns 无
   */
 function printInfoSrcSum() {
-  let h   = entropy(p),       // 信源熵
-      num = 0;
-
   printf('信源符号的概率分布：\n');
   printf('xi    value\tp\n');
   printf('-------------------------\n');
-  for(let i=0; i<SNUM_MAX; i++) {
-    if(freq[i] !== 0) printf(`x${++num} \t${i}\t${p[i]}\n`);
+  for(let i=0, num=0; i<SNUM_MAX; i++) {
+    (freq[i] !== 0) && printf(`x${++num} \t${i}\t${p[i]}\n`);
   }
   printf('-------------------------\n');
-  printf(`熵:\t\t${h} bit\n`);
-  printf(`剩余度:\t\t${redundancy(h, num)}\n\n`);
+  printf(`熵:\t\t${H} bit\n`);
+  printf(`剩余度:\t\t${redundancy(H, symNum)}\n\n`);
 }
 
-/**
-  * 将信源文件中每个符号出现的频次，等比例缩小，使缩小
-  * 后的频次取值在0～255之间。频次为零的保持不变，频次
-  * 不为零的等比例缩小不会为零。
-  *
-  * @returns {bool}  是否进行了等比缩小，true 缩小了，false 没有缩小
-  */
-function scaleFreq() {
-  let f = 0, max = 0, scale = 0;
-
-  for(let i=0; i<SNUM_MAX; i++) {
-    if(freq[i] > max)  max = freq[i];
-  }
-
-  if(max < SNUM_MAX) return false;
-
-  scale = (max / SNUM_MAX) + 1;
-
-  for(let i=0; i<SNUM_MAX; i++) {
-    if(freq[i] !== 0) {
-      f = roundFractional(freq[i] / scale, 0);
-      freq[i] = (f === 0) ? 1 : f;
-    }
-  }
-
-  printFreq();
-  return true;
-}
-
-/**
-  * 缩减后的信源文件分析——计算信源文件每个符号的概率
-  *
-  * @returns 无
-  */
-function scaledInfoSrcAnalyze() {
-  let total = 0;
-
-  for(let i=0; i<SNUM_MAX; i++) total += freq[i];
-
-  for(i=0; i<SNUM_MAX; i++) miniP[i] = roundFractional(freq[i] / total, 6);
-
-  miniTFq = total;
-
-  printScaledInfoSrcSum();
-}
-
-/**
-  * 打印缩减信源分析结果，缩减信源每个符号的概率、信源熵以及信源的剩余度。
-  *
-  * @returns 无
-  */
-function printScaledInfoSrcSum() {
-  let h   = entropy(miniP),       // 缩减信源的熵
-      num = 0;
-
-  printf('信源符号的概率分布：\n');
-  printf('xi    value\tp\n');
-  printf('-------------------------\n');
-  for(let i=0; i<SNUM_MAX; i++) {
-    if(freq[i] !== 0) printf(`x${++num} \t${i}\t${miniP[i]}\n`);
-  }
-  printf('-------------------------\n');
-  printf(`熵:\t\t${h} bit\n`);
-  printf(`剩余度:\t\t${redundancy(h, num)}\n\n`);
-}
 /**
   * 计算压缩文件头部存储频次表等信息的开销
   *
-  * @return inti 以字节为单位的开销大小
+  * @param 无
+  *
+  * @return {Number} 以字节为单位的开销大小
   */
 function storeCost() {
   // 码表保存方式：
@@ -242,17 +139,17 @@ function storeCost() {
   //    [START] 是行程段中 ASCII 值最小的信源符号其 ASCII 值，占一个字节
   //    [LENGTH] 是行程段中 ASCII 值连续的符号个数，占一个字节
   //    [...] 是该行程段中按 ASCII 值从小到大，每个信源符号的频次
-  //    这样保存的码表消耗的存储空间为：secNum * 2 + n 字节
+  //    这样保存的码表消耗的存储空间为：secNum * 2 + symNum 字节
   //    其中：secNum 是行程段数，n 为信源符号个数
   // 3. 配对存储，存储方式为：[SYMBOL][FREQUENCE]，frqMode = 1
   //    [SYMBOL] 是信源符号的 ASCII 值，占一个字节
   //    [REQUENCE] 是信源符号的频次，占一个字节
-  //    这样保存的码表消耗的存储空间为：2 * n 字节
+  //    这样保存的码表消耗的存储空间为：2 * symNum 字节
 
   // 三种存储方案，应选择占用空间最小的存储方案
 
   let str = freq.map(f => f === 0 ? 'x' : 1).join('');
-  let sec = str.match(/\d+/g);
+  let distance = 0, sec = str.match(/\d+/g);
 
   for(let i=0, pos=0, len=0; i<sec.length; i++, pos+=len) {
     pos = str.indexOf('1', pos);
@@ -267,7 +164,7 @@ function storeCost() {
 
   // 两个行程段间距小于等于 2 的进行合并
   for(let i=0; i<runLen.length-1; i++) {
-    let distance = runLen[i+1].pos - runLen[i].pos - runLen[i].len;
+    distance = runLen[i+1].pos - runLen[i].pos - runLen[i].len;
     if(distance < 3) {
       runLen[i].len += distance + runLen[i+1].len;
       runLen.splice(i+1, 1);
@@ -281,13 +178,13 @@ function storeCost() {
 
   printf('合并后行程信息：\n');
   printRunLen();
-  printf(`行程段数：\t${runLen.length}\n频次总数：\t${runLenCost}\n\n`);
+  printf(`行程段数：${runLen.length}\n频次总数：${runLenCost}\n\n`);
   runLenCost += runLen.length * 2;
 
   printf('合并后行程分析：\n');
   printRunLenAnalysis();
 
-  let cost = [SNUM_MAX, 2 * n, runLenCost];
+  let cost = [SNUM_MAX, 2 * symNum, runLenCost];
 
   // 三种存储方案的存储总开销，取最小值
   let size = Math.min(...cost) + HFM_FILE_TOKEN.length + 2;
@@ -297,6 +194,162 @@ function storeCost() {
   return(size);
 }
 
+/**
+  * 打印输出行程段信息
+  *
+  * @param 无
+  *
+  * @returns 无
+  */
+function printRunLen() {
+  printf('start\tlen\n');
+  printf('----------------\n');
+  runLen.forEach(seg => printf(`${seg.pos}\t${seg.len}\n`));
+  printf('----------------\n');
+}
+
+/**
+  * 打印输出行程段分析信息
+  *
+  * @param 无
+  *
+  * @returns 无
+  */
+function printRunLenAnalysis() {
+  printf('i\tpos1\tlen\tpos2\tdistance\n');
+  printf('----------------------------------------\n');
+  for(let i=0; i<runLen.length-1; i++) {
+    printf(`${i}\t${runLen[i].pos}\t${runLen[i].len}\t${runLen[i+1].pos}\t${runLen[i+1].pos - runLen[i].pos - runLen[i].len}\n`);
+  }
+  printf('----------------------------------------\n\n');
+}
+
+/**
+  * 将信源文件打包。因为对信源文件的压缩不足以抵消存储
+  * 频次表的开销，因此不压缩信源文件，仅仅将其封装。即
+  * 仅仅加上 Huffman 文件头标识符，其他部分与信源文件的每
+  * 个字节都完全相同。
+  *
+  * @param 无
+  *
+  * @returns 无
+  */
+function wrapSrcFile() {
+  const flag = 0x00;    // 最高位为 0，代表信源文件没有被压缩
+
+  dfLen = HFM_FILE_TOKEN.length + 1 + sfLen;
+  const data = new Uint8Array(dfLen);
+
+  data[0] = HFM_FILE_TOKEN.charCodeAt(0);
+  data[1] = HFM_FILE_TOKEN.charCodeAt(1);
+  data[2] = HFM_FILE_TOKEN.charCodeAt(2);
+  data[3] = flag;
+
+  for(let i=4; i<dfLen; i++) data[i] = srcData[i-4];
+
+  writeFile(data);
+}
+
+function writeFile(data, fileName) {
+  const fs = require('fs');
+
+  dstFileName = fileName || getDstFileName();
+  fs.writeFileSync(dstFileName, data, 'binary');
+}
+
+function getDstFileName() {
+  return srcFileName.split('.')[0] + '.hfm';
+}
+
+
+/**
+  * 打印输出信息
+  *
+  * @param 无
+  *
+  * @returns 无
+  */
+// function printf(data) {
+//   $output.append(data);
+// }
+
+function printf(data) {
+  process.stdout.write(data);
+}
+
+/**
+  * 将信源文件中每个符号出现的频次，等比例缩小，使缩小
+  * 后的频次取值在 0～255 之间。频次为零的保持不变，频次
+  * 不为零的等比例缩小不会为零。
+  *
+  * @param 无
+  *
+  * @returns {Boolean} 是否进行了等比缩小，true 缩小了，false 没有缩小
+  */
+function scaleFreq() {
+  let max = 0;
+
+  freq.forEach(f => max = (f > max) ? f : max);
+
+  if(max < SNUM_MAX) return false;
+
+  let scale = (max / SNUM_MAX) + 1;
+
+  for(let i=0, f=0; i<SNUM_MAX; i++) {
+    if(freq[i] !== 0) {
+      f = roundFractional(freq[i] / scale, 0);
+      freq[i] = (f === 0) ? 1 : f;
+    }
+  }
+
+  printFreq();
+  return true;
+}
+
+/**
+  * 缩减后的信源文件分析——计算信源文件每个符号的概率
+  *
+  * @param 无
+  *
+  * @returns 无
+  */
+function scaledInfoSrcAnalyze() {
+  totalFrq = 0;
+  freq.forEach(f => totalFrq += f);
+
+  for(let i=0; i<SNUM_MAX; i++) p[i] = roundFractional(freq[i] / totalFrq, 6);
+
+  printScaledInfoSrcSum();
+}
+
+/**
+  * 打印缩减信源分析结果，缩减信源每个符号的概率、信源熵以及信源的剩余度
+  *
+  * @param 无
+  *
+  * @returns 无
+  */
+function printScaledInfoSrcSum() {
+  let H   = entropy(p);       // 缩减信源的熵
+
+  printf('信源符号的概率分布：\n');
+  printf('xi    value\tp\n');
+  printf('-------------------------\n');
+  for(let i=0, num=0; i<SNUM_MAX; i++) {
+    (freq[i] !== 0) && printf(`x${++num} \t${i}\t${p[i]}\n`);
+  }
+  printf('-------------------------\n');
+  printf(`熵:\t\t${H} bit\n`);
+  printf(`剩余度:\t\t${redundancy(H, symNum)}\n\n`);
+}
+
+/**
+  * 初始化 huffman 树的前 256 个节点，以及树的根节点
+  *
+  * @param 无
+  *
+  * @returns 无
+  */
 function initHfmTree() {
   for(let i=0; i<SNUM_MAX; i++) hfmTree[i].w = freq[i];
 
@@ -307,24 +360,25 @@ function initHfmTree() {
 }
 
 /**
-  * 打印压缩结果。包括信源文件长度，目标文件长度和压缩率。
+  * 打印 Huffman 树各个活动节点的信息
   *
   * @param 无
   *
   * @returns 无
   */
-function printResult() {
-  printf('\n\n压缩结果：\n');
+function printHfmTree() {
+  printf('Huffman 树：\n');
+  printf('xi\tpos\tweight\tl\tr\tp\n');
   printf('---------------------------------------------\n');
-  printf(`原始文件：\t${srcFileName}\t${sfLen} 字节\n`);
-  printf(`目标文件：\t${dstFileName}\t${dfLen} 字节\n`);
-  printf('---------------------------------------------\n');
-  printf(`压缩率：\t${roundFractional(dfLen * 100 / sfLen, 2)} %\n`);
+  for(let i=0, num=0; i<NNUM_MAX; i++) {
+    (hfmTree[i].w !== 0) && printf(`x${++num}\t${i}\t${hfmTree[i].w}\t${hfmTree[i].l}\t${hfmTree[i].r}\t${hfmTree[i].p}\n`);
+  }
+  printf('---------------------------------------------\n\n');
 }
 
 /**
   * 利用信源符号缩减的原理，将 Huffman 树各个活动叶子节点
-  * 与缩减的中间节点连接成一棵二叉树。
+  * 与缩减的中间节点连接成一棵二叉树
   *
   * @param 无
   *
@@ -357,20 +411,20 @@ function genHfmTree() {
   * 从 Huffman 树中选择权重最小的两个节点。条件是这两个节
   * 点是活动节点，并且是孤立节点，可以是叶子节点也可以是
   * 中间节点，最后权重需要满足下面的不等式：
-  *   weight(s1) <= weight(s2) <= weight(other node)。
+  *   weight(s1) <= weight(s2) <= weight(other node)
   *
-  * @return s1    第一个节点的下标
-  *         s2    第二个节点的下标
+  * @return {Object} s1 第一个节点的下标
+  *                  s2 第二个节点的下标
   */
 function select() {
   const num = hfmTree[HEAD].w;
   let minWeight = Infinity;
 
   s1 = s2 = HEAD;
-  for(let i=0; i<num; i++) {
-    if((hfmTree[i].w < minWeight)     /* HfmTree[i] 的权重最小 */
-      && (hfmTree[i].w !== 0)         /* HfmTree[i] 是活动节点 */
-      && (hfmTree[i].p === 0))        /* HfmTree[i] 是孤立节点 */
+  for(let i=0; i<num; i++) {     // 选出 s1
+    if((hfmTree[i].w < minWeight)/* HfmTree[i] 的权重最小 */
+      && (hfmTree[i].w !== 0)    /* HfmTree[i] 是活动节点 */
+      && (hfmTree[i].p === 0))   /* HfmTree[i] 是孤立节点 */
     {
       minWeight = hfmTree[i].w;
       s1 = i;
@@ -378,11 +432,11 @@ function select() {
   }
 
   minWeight = Infinity;
-  for(let i=0; i<num; i++) {
-    if((hfmTree[i].w < minWeight)     /* HfmTree[i]的权重最小 */
-      && (hfmTree[i].w !== 0)         /* HfmTree[i]是活动节点 */
-      && (hfmTree[i].p === 0)         /* HfmTree[i]是孤立节点 */
-      && (i !== s1))                  /* s2 <> s1             */
+  for(let i=0; i<num; i++) {     // 选出 s2
+    if((hfmTree[i].w < minWeight)/* HfmTree[i] 的权重最小 */
+      && (hfmTree[i].w !== 0)    /* HfmTree[i] 是活动节点 */
+      && (hfmTree[i].p === 0)    /* HfmTree[i] 是孤立节点 */
+      && (i !== s1))             /* s2 <> s1              */
     {
       minWeight = hfmTree[i].w;
       s2 = i;
@@ -392,27 +446,6 @@ function select() {
   printf(`s1 = ${s1}  \ts2 = ${s2}  \ts3 = ${num}\n`);
 
   return {s1, s2};
-}
-
-/**
-  * 打印 Huffman 树各个活动节点的信息
-  *
-  * @param 无
-  *
-  * @returns 无
-  */
-function printHfmTree() {
-  let num = 0;
-
-  printf('Huffman 树：\n');
-  printf('xi\tpos\tweight\tl\tr\tp\n');
-  printf('---------------------------------------------\n');
-  for(let i=0; i<NNUM_MAX; i++) {
-    if(hfmTree[i].w !== 0) {
-      printf(`x${++num}\t${i}\t${hfmTree[i].w}\t${hfmTree[i].l}\t${hfmTree[i].r}\t${hfmTree[i].p}\n`);
-    }
-  }
-  printf('---------------------------------------------\n\n');
 }
 
 /**
@@ -428,100 +461,55 @@ function printHfmTree() {
   */
 function genHfmCode() {
   for(let i=0; i<SNUM_MAX; i++) {
-    let pos,
-        code = '',
-        pHfmCode = null,
-        node = null;
+    if(hfmTree[i].p === 0) continue;    // 不是叶子节点略过
 
-    if(hfmTree[i].p === 0) continue;    // 不是叶子节点继续
-    node = hfmTree[i];
-    pos  = i;
+    let pos = i, node = hfmTree[i], code = '';
 
     // 生成码字，从叶子节点往根节点走
-    while(node.p !== 0) {             // NOT_TOUCH_ROOT
+    while(node.p !== 0) { // NOT_TOUCH_ROOT
       code += ((hfmTree[node.p].l === pos) ? '1' : '0');
-      pos = node.p;                   // MOVE_TO_ROOT
+      pos = node.p;       // MOVE_TO_ROOT
       node = hfmTree[pos];
     }
 
     // 反转码字，码字从根节点到叶子节点
-    hfmCode[i] = code.split('').reverse().join('')
+    hfmCode[i] = code.split('').reverse().join('');
   }
 
   printHfmCode();
 }
 
 /**
-  * 打印 Huffman 编码生成的码字。
+  * 打印 Huffman 编码生成的码字
   *
   * @param 无
   *
   * @returns 无
   */
 function printHfmCode() {
-  let num = 0, avgLen = 0;
+  let avgLen = 0;
 
   printf('码字：\n');
   printf('xi\tpos\tfreq\tlen\tCode\n');
   printf('---------------------------------------------\n');
-  for(let i=0; i<SNUM_MAX; i++) {
+  for(let i=0, num=0; i<SNUM_MAX; i++) {
     if(freq[i] !== 0) {     // 是信源符号
-      num++;
       avgLen += p[i] * hfmCode[i].length;
-      printf(`x${num}\t${i}\t${freq[i]}\t${hfmCode[i].length}\t${hfmCode[i]}\n`);
+      printf(`x${++num}\t${i}\t${freq[i]}\t${hfmCode[i].length}\t${hfmCode[i]}\n`);
     }
   }
   printf('---------------------------------------------\n');
   printf(`平均码长：\t${roundFractional(avgLen, 3)}\n`);
-  printf(`编码效率：\t${roundFractional(100 * entropy(p) / avgLen, 2)} %\n`);
+  printf(`编码效率：\t${roundFractional(100 * H / avgLen, 2)} %\n`);
   printf(`理论压缩率：\t${roundFractional(100.0 * avgLen / CHAR_BIT, 2)} %\n\n`);
 }
 
 /**
-  * 将信源文件打包。因为对信源文件的压缩不足以抵消存储
-  * 频次表的开销，因此不压缩信源文件，仅仅将其封装。即
-  * 仅仅加上 Huffman 文件头标识符，其他部分与信源文件的每
-  * 个字节都完全相同。
-  *
-  * @param 无
-  *
-  * @returns 无
-  */
-function wrapSrcFile() {
-  const flag = 0x00;    // 最高位为 0，代表信源文件没有被压缩
-
-  const len = HFM_FILE_TOKEN.length + 1 + srcData.length;
-  const data = new Uint8Array(len);
-
-  data[0] = HFM_FILE_TOKEN.charCodeAt(0);
-  data[1] = HFM_FILE_TOKEN.charCodeAt(1);
-  data[2] = HFM_FILE_TOKEN.charCodeAt(2);
-  data[3] = flag;
-
-  for(let i=4; i<len; i++) data[i] = srcData[i-4];
-
-  dfLen = data.length;
-
-  writeFile(data);
-}
-
-function writeFile(data, fileName) {
-  const fs = require('fs');
-
-  dstFileName = fileName || getDstFileName();
-  fs.writeFileSync(dstFileName, data, 'binary');
-}
-
-function getDstFileName() {
-  return srcFileName.split('.')[0] + '.hfm';
-}
-
-/**
   * 写 Huffman 压缩文件的头信息，包括三部分：文件标识符、
-  * FLAG和频次表。频次表的存储有两种方式，行程长度存储
-  * 和连续存储。
+  * FLAG 和频次表。频次表的存储有三种方式，行程长度存储、
+  * 连续存储和成对存储。
   *
-  * @param data 压缩文件内容的字节数组
+  * @param {Uint8Array} data 压缩文件内容的字节数组
   *
   * @returns 无
   */
@@ -534,7 +522,7 @@ function writeHfmFileHead(data) {
   if(frqMode === 0) { // 顺序存储码表
     data[3] = 0x80;   // 第 7 位置 1，代表对信源文件进行压缩
                       // 第 6, 5 位置 00，代表采用顺序存储
-    data[4] = n;
+    data[4] = symNum;
     for(let i=0; i<SNUM_MAX; i++) data[i+5] = freq[i];
     return;
   }
@@ -542,7 +530,7 @@ function writeHfmFileHead(data) {
   if(frqMode === 1) { // 成对存储码表
     data[3] = 0xa0;   // 第 7 位置 1，代表对信源文件进行压缩
                       // 第 6, 5 位置 01，代表采用成对存储
-    data[4] = n;
+    data[4] = symNum;
     for(let i=0, pos=5; i<SNUM_MAX; i++) {
       if(freq[i] !== 0) {
         data[pos++] = i;
@@ -566,14 +554,14 @@ function writeHfmFileHead(data) {
 }
 
 /**
-  * 利用信源符号对应的码字，对信源文件重新编码，实现压缩。
+  * 利用信源符号对应的码字，对信源文件重新编码，实现压缩
   *
-  * @param data 信源文件的字节数组
+  * @param 无
   *
   * @returns 无
   */
 function writeHfmFile() {
-  let data = new Uint8Array(sfLen);  // 这个长度有些大，看看怎么优化一下
+  let data = new Uint8Array(sfLen);  // 这个长度有些大
   data.fill(0);
 
   writeHfmFileHead(data);
@@ -584,7 +572,7 @@ function writeHfmFile() {
 
     while(buf.length >= 8) {
       code = buf.substr(0, 8);
-      data[pos++] = code.split('').reduce((m, v, i) => m += v * Math.pow(2, 7-i), 0);
+      data[pos++] = parseInt(code, 2);
       buf = buf.slice(8, buf.length);
     }
   }
@@ -593,7 +581,7 @@ function writeHfmFile() {
     pos++;
     data[4] += buf.length;
     code = (buf + '00000000').substr(0, 8);
-    data[pos++] = code.split('').reduce((m, v, i) => m += v * Math.pow(2, 7-i), 0);
+    data[pos++] = parseInt(code);
   }
 
   data  = data.slice(0, pos);
@@ -604,43 +592,27 @@ function writeHfmFile() {
 }
 
 /**
-  * 对信源文件做 Huffman 压缩编码
-  *
-  * @param data 信源文件的字节数组
-  *
-  * @returns 无
-  */
-function compress(data, file, output) {
-  $output = output;
-
-  initData(data, file);
-  statFreq();
-  infoSrcAnalyze();
-
-  let h = entropy(p);
-
-  headSize = storeCost();
-  let notNeedCompress = (sfLen - sfLen * h / CHAR_BIT) < headSize;
-
-  if(notNeedCompress) {
-    wrapSrcFile();
-    return;
-  }
-
-  if(scaleFreq())  scaledInfoSrcAnalyze();
-
-  initHfmTree();
-  genHfmTree();
-  genHfmCode();
-  writeHfmFile();
-}
-
-/**
-  * 判断是否为合法的Huffman压缩文件。
+  * 打印压缩结果。包括信源文件长度，目标文件长度和压缩率
   *
   * @param 无
   *
-  * @returns bool true 合法，false 非法
+  * @returns 无
+  */
+function printResult() {
+  printf('\n\n压缩结果：\n');
+  printf('---------------------------------------------\n');
+  printf(`原始文件：\t${srcFileName}\t${sfLen} 字节\n`);
+  printf(`目标文件：\t${dstFileName}\t${dfLen} 字节\n`);
+  printf('---------------------------------------------\n');
+  printf(`压缩率：\t${roundFractional(dfLen * 100 / sfLen, 2)} %\n`);
+}
+
+/**
+  * 判断是否为合法的 Huffman 压缩文件
+  *
+  * @param 无
+  *
+  * @returns {Boolean} true 合法，false 非法
   */
 function isHFMFile() {
   let token = '';
@@ -651,69 +623,22 @@ function isHFMFile() {
 }
 
 /**
-  * Huffman 解压缩
-  *
-  * @param data 信源文件的字节数组
-  *
-  * @returns 无
-  */
-function decompress(data, file, output) {
-  initData(data, file);
-
-  if(!isHFMFile()) {
-    printf(`${file} 压缩文件格式不正确！\n`);
-    return;
-  }
-
-  let flag    = srcData[3],
-      okFlags = [0x00, 0x80, 0xA0, 0xC0], // 合法的 falg 高四位
-      mask    = 0xf0;                     // 取高四位的掩码
-
-  // 对 FLAG 字段进行合法性校验，参考设计文档
-  flag &= mask;
-
-  if(okFlags.indexOf(flag) === -1) {
-    printf(`${file} 压缩文件格式不正确！\n`);
-    return;
-  }
-
-  if(flag === 0x00) {        // 信源文件没有被压缩
-    srcData = srcData.slice(4, srcData.length);
-    dfLen   = srcData.length;
-    writeFile(srcData, 'test2.bin');
-    return;
-  }
-
-  if(!readFrq()) {      // 频次读取错误的处理
-    return;
-  }
-
-  infoSrcAnalyze();
-  initHfmTree();
-  genHfmTree();
-  genHfmCode();
-/*
-  decodeFile(fpSrc, fpDst);
-*/
-}
-
-/**
   * 从压缩文件读取频次表信息
   *
   * @param 无
   *
-  * @returns bool true 读取频次正确，false 读取频次错误
+  * @returns 无
   */
 function readFrq() {
-  let flag = srcData[3] & 0x60;    // 读取 flag 的第 6，5 位
-                                   // 获得频次存储方式
+  let flag = srcData[3] & 0x60; // 读取 flag 的第 6，5 位
+                                // 获得频次存储方式
 
   if(flag === 0x00) { // 顺序读取频次表
-    for(let i=0; i<SNUM_MAX; i++)    freq[i] = srcData[i+5];
+    for(let i=0; i<SNUM_MAX; i++) freq[i] = srcData[i+5];
   }
 
   if(flag === 0x20) { // 成对读取频次表
-    n = srcData[4];
+    symNum = srcData[4];
     for(let i=0, pos=5; i<n; i++) freq[srcData[pos++]] = srcData[pos++];
   }
 
@@ -727,46 +652,29 @@ function readFrq() {
     }
   }
 
-  // 检验频次读取是否正确。频次不能为负，所有频次和不能为 0。
+  // 检验频次读取是否正确。频次不能为负，所有频次和不能为 0
   for(i=0; i<SNUM_MAX; i++) {
     if(freq[i] < 0) {
-      printf(`ERROR: ${srcFileName} 原文件格式不正确或者已损坏！\n`);
-      return false;
+      throw(`ERROR: ${srcFileName} 原文件格式不正确或者已损坏！\n`);
     }
-    miniTFq += freq[i];
+    totalFrq += freq[i];
   }
 
-  if(miniTFq === 0) {
-    printf(`ERROR: ${srcFileName} 原文件格式不正确或者已损坏！\n`);
-    return false;
+  if(totalFrq === 0) {
+    throw(`ERROR: ${srcFileName} 原文件格式不正确或者已损坏！\n`);
   }
 
   printFreq();
-  return true;
 }
-
-function main() {
-  const fs = require('fs'),
-        //fname = 'test.txt';
-        //fname = 'test.bin';
-        fname = 'test.hfm';
-
-  //compress(fs.readFileSync(fname), fname);
-  //reportCompress();
-  decompress(fs.readFileSync(fname), fname);
-  reportDecompress();
-}
-
-main();
 
 /**
-  * 打印压缩报告。包括：信源分析、编码信息以及压缩效果。
+  * 打印压缩报告。包括：信源分析、编码信息以及压缩效果
   *
   * @param 无
   *
   * @returns 无
   */
-function report() {
+function reportCompress() {
   let num = 0, H = 0, avgLen = 0;
 
   printf('\n\t\t-- REPORT --\n\n');
@@ -783,7 +691,7 @@ function report() {
   printf(`符号个数：\t${num}\n`);
   H = entropy(p);
   printf(`熵：\t\t${H} bit\n`);
-  printf(`剩余度：\t${roundFractional(1 - (H / (LB10 * Math.log10(num))), 2)}\n\n`);
+  printf(`剩余度：\t${roundFractional(1 - (H / Math.log2(num)), 2)}\n\n`);
 
   printf('编码：\n');
   printf('---------------------------------------------\n');
@@ -801,65 +709,31 @@ function report() {
 }
 
 /**
-  * 将压缩文件中的 Huffman 编码还原成信源文件符号。
+  * 将压缩文件中的 Huffman 编码还原成信源文件符号
   *
   * @param 无
   *
   * @returns 无
   */
 function decodeFile() {
-  /*
-  unsigned char bit = 0x00;
-  const unsigned char mask  = 0x80;    // 取最高位的掩码
-  const unsigned char LFour = 0x0f;    // 取低四位的掩码
-  HufNode *node = HEAD_NODE;
-  int i, ch, pos = HfmTree[HEAD].w - 1;
-  long fpos = 0, flen = 0, len = 0;
+  const mask  = 0x80;    // 取最高位的掩码
 
-  fpos = ftell(fpSrc);
-  fseek(fpSrc, strlen(HFM_FILE_TOKEN), SEEK_SET);
-  len = fgetc(fpSrc) & LFour;
+  // 逐字节读取压缩文件主体
+  for(let i=0; i<srcData.length; i++) {
 
-  fseek(fpSrc, 0, SEEK_END);
-  flen = ftell(fpSrc);
+    // 利用 mask 循环移位操作读取每一位
 
-  fseek(fpSrc, fpos, SEEK_SET);
+    // 每一位是 0 或者 1，在 huffman 树上移动
 
-  while(ftell(fpSrc) < (flen-1))
-  {
-    ch = fgetc(fpSrc);
-    for(i=0; i<CHAR_BIT; i++)
-    {
-      bit = ch & (mask >> i);
+    // 从树的根节点移动到树的叶子节点后
 
-//#define MOVE_TO_LEAF	pos = (bit == 0x00) ? node->r : node->l;	node = &HfmTree[pos];
-      MOVE_TO_LEAF;
+    // 如果不是叶子节点，继续取位并移动
 
-//#define IS_LEAF_NODE	(node->l == 0) && (node->r == 0) && (node->p != 0)
-      if(IS_LEAF_NODE)
-      {
-        fputc(pos, fpDst);
-        node = HEAD_NODE;
-      }
-    }
+    // 如果是叶子节点，把叶子节点的信息写入目标数组
+
   }
 
-  // 翻译最后一个字节，最后一个字节可能没有填满
-  ch  = fgetc(fpSrc);
-  len = (len == 0) ? CHAR_BIT : len;
-  for(i=0; i<len; i++)
-  {
-    bit = ch & (mask >> i);
-
-    MOVE_TO_LEAF;
-
-    if(IS_LEAF_NODE)
-    {
-      fputc(pos, fpDst);
-      node = HEAD_NODE;
-    }
-  }
-*/
+  // 所有压缩文件主体都遍历完了，将数组数据，写入文件
 }
 
 /**
@@ -875,5 +749,89 @@ function reportDecompress() {
   printf(`原始文件：\t${srcFileName}\t${sfLen} 字节\n`);
   printf(`目标文件：\t${dstFileName}\t${dfLen} 字节\n`);
 }
+
+/**
+  * 对信源文件做 Huffman 压缩编码
+  *
+  * @param {Uint8Array} data   信源文件的字节数组
+  *        {String}     file   把压缩的信源文件名
+  *        {String}     output 输出信息的 DOM 对象
+  *
+  * @returns 无
+  */
+function compress(data, file, output) {
+  $output = output;
+
+  initData(data, file);
+  statFreq();
+  infoSrcAnalyze();
+
+  headSize = storeCost();
+  let notNeedCompress = (sfLen - sfLen * H / CHAR_BIT) < headSize;
+
+  if(notNeedCompress) {
+    wrapSrcFile();
+    return;
+  }
+
+  scaleFreq() && scaledInfoSrcAnalyze();
+
+  initHfmTree();
+  genHfmTree();
+  genHfmCode();
+  writeHfmFile();
+}
+
+/**
+  * Huffman 解压缩
+  *
+  * @param {Uint8Array} data   信源文件的字节数组
+  *        {String}     file   压缩文件名
+  *        {String}     output 输出信息的 DOM 对象
+  *
+  * @returns 无
+  */
+function decompress(data, file, output) {
+  initData(data, file);
+
+  if(!isHFMFile()) throw(`ERROR: ${file} 压缩文件格式不正确！\n`);
+
+  let flag    = srcData[3],
+      okFlags = [0x00, 0x80, 0xA0, 0xC0], // 合法的 falg 高四位
+      mask    = 0xf0;                     // 取高四位的掩码
+
+  // 对 FLAG 字段进行合法性校验
+  flag &= mask;
+
+  if(okFlags.indexOf(flag) === -1) throw(`ERROR: ${file} 压缩文件格式不正确！\n`);
+
+  if(flag === 0x00) { // 信源文件没有被压缩
+    srcData = srcData.slice(4, srcData.length);
+    dfLen   = srcData.length;
+    writeFile(srcData, 'test2.bin');
+    return;
+  }
+
+  readFrq();
+  infoSrcAnalyze();
+  initHfmTree();
+  genHfmTree();
+  genHfmCode();
+  decodeFile(pos);
+}
+
+function main() {
+  const fs = require('fs'),
+        //fname = 'test.txt';
+        //fname = 'test.bin';
+        fname = 'test.hfm';
+
+  //compress(fs.readFileSync(fname), fname);
+  //reportCompress();
+  decompress(fs.readFileSync(fname), fname);
+  //reportDecompress();
+}
+
+main();
 //  return { compress, decompress };
 //})();

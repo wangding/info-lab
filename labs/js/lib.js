@@ -4,8 +4,9 @@
  * 小数点后面保留第 n 位
  *
  * @param x 做近似处理的数
- * @param n 小数点后第 n 位
- * @returns 近似处理后的数 
+ *        n 小数点后第 n 位
+ *
+ * @returns 近似处理后的数
  */
 function roundFractional(x, n) {
   return Math.round(x * Math.pow(10, n)) / Math.pow(10, n);
@@ -15,6 +16,7 @@ function roundFractional(x, n) {
  * 计算自信息量
  *
  * @param p 概率，取值范围 0 ~ 1
+ *
  * @returns -log(p)
  */
 function i(p) {
@@ -25,6 +27,7 @@ function i(p) {
  * 计算 p*log(p)
  *
  * @param p 概率，取值范围 0 ~ 1
+ *
  * @returns p*log(p)
  */
 function plog(p) {
@@ -35,6 +38,7 @@ function plog(p) {
  * 计算二进制熵
  *
  * @param p 概率，取值范围 0 ~ 1
+ *
  * @returns -p*log(p) - (1-p)*log(1-p)
  */
 function h(p) {
@@ -65,6 +69,7 @@ function entropy(p) {
  *
  * @param h 信源熵
  * @param n 信源符号个数
+ *
  * @returns {double} 信源冗余度
  */
 function redundancy(h, n) {
