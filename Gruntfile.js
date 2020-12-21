@@ -35,19 +35,6 @@ module.exports = function (grunt) {
         }]
       }
     },
-    replace: {
-      html: {
-        src: ['dist/*.html', 'dist/**/*.html'],
-        overwrite: true,
-        replacements: [{
-          from: 'href="css',
-          to: 'href="https://cdn.jsdelivr.net/gh/wangding/info-lab@gh-pages/labs/css'
-        }, {
-          from: 'src="js',
-          to: 'src="https://cdn.jsdelivr.net/gh/wangding/info-lab@gh-pages/labs/js'
-        }]
-      }
-    },
     copy: {
       main: {
         files: [
@@ -58,6 +45,16 @@ module.exports = function (grunt) {
             dest: 'dist/03-third-part-widget/'
           }
         ]
+      }
+    },
+    qiniu_qupload: {
+      default_options: {
+        options: {
+          ak: 'QINIU_AK',
+          sk: 'QINIU_SK',
+          bucket: 'app-info-lab',
+          assets: [{src: 'dist', prefix: ''}]
+        }
       }
     },
     htmlhint: {
@@ -84,12 +81,12 @@ module.exports = function (grunt) {
   grunt.loadNpmTasks('grunt-contrib-htmlmin');
   grunt.loadNpmTasks('grunt-contrib-cssmin');
   grunt.loadNpmTasks('grunt-contrib-imagemin');
-
+  grunt.loadNpmTasks('@wangding/grunt-qiniu-qupload');
   grunt.loadNpmTasks('grunt-htmlhint');
   grunt.loadNpmTasks('grunt-contrib-csslint');
   grunt.loadNpmTasks('grunt-eslint');
-  grunt.loadNpmTasks('grunt-text-replace');
 
   grunt.registerTask('lint', ['htmlhint', 'csslint', 'eslint']);
-  grunt.registerTask('build', ['htmlmin', 'cssmin', 'uglify', 'imagemin', 'replace']);
+  grunt.registerTask('build', ['htmlmin', 'cssmin', 'uglify', 'imagemin']);
+  grunt.registerTask('upload', ['qiniu_qupload']);
 };
