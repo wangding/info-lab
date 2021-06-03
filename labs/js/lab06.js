@@ -1,0 +1,1 @@
+$((function(){let e,n=$("#compress"),c=$("#decompress"),t=$(".output>pre"),i=$('input[type="file"]').get(0),r=new FileReader;n.click((function(){i.click()})),c.click((function(){i.click()})),i.onchange=function(){let n=i.files;if(0===n.length)return;e=n[0].name,r.readAsArrayBuffer(n[0])},r.onload=function(){let n=new window.Uint8Array(r.result);huffman.compress(n,e,t)}}));
