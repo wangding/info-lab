@@ -1,4 +1,4 @@
-/* exported i h c entropy roundFractional redundancy */
+/* exported i h c $ entropy roundFractional redundancy */
 
 /**
  * 小数点后面保留第 n 位
@@ -85,3 +85,6 @@ function redundancy(h, n) {
 function c(p) {
   return roundFractional(1 + plog(p) + plog(1 - p), 4);
 }
+
+const q = document.querySelector,
+      $ = q.bind(document);
